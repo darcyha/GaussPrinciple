@@ -1,7 +1,4 @@
 function ContactDynamics
-% NOTE: This project currently uses NNLS code from http://www.cs.utexas.edu/users/dmkim/software/proj_toolbox.tar.bz2
-
-%rng(12321);
 rng(1);
 global x;
 x = [0.1;.8];
@@ -35,7 +32,7 @@ bNorms = [ ...
     -1 ; 0 ; ...
     1 ; 0 ];
 
-bDists = [ 0 ; -.5 ; 0 ];
+bDists = [ 0 ; -5 ; 0 ];
 
 global opts; 
 opts = solopt();
@@ -46,26 +43,30 @@ Q = spdiags( sqrt(m)*ones(n,1), 0, n, n );
 Qi = spdiags( 1./(sqrt(m)*ones(n,1)), 0, n, n );
 
 % TODO: Enforce valid velocity for objects already in contact at t0.
-[a, vCur] = compute_accelerations( x, v, r, Q, Qi, bNorms, bDists );
+[a, vCur] = compute_accelerations( x, v, r, Q, Qi, bNorms, bDists, false );
 
 % Compute v1/2 from v0 + h/2 a0
 vCur = vCur + h/2*a;
 v = vCur;
 
-fileID = fopen( sprintf('D:\\particles_tk003_%04d.csv', 0),'w');
+path = 'D:\\particles_tk005_%04d.csv';
+fileID = fopen( sprintf(path, 0),'w');
 fprintf(fileID,'float32 Position[0],float32 Position[1],float32 Position[2],float32 Radius\r\n');
 fprintf(fileID,'%g, %g, 0.0, %g\r\n',[reshape( x, 2, [] ); r']);
 fclose(fileID);
 
 for i=1:5000
-    if( mod(i, 10) == 9 )
+    if( mod(i, 100) == 0 )
+        fprintf( '\rFrame %04d', i );
+    end
+    if( mod(i, 2) == 0 )
         xNew = zeros(2,1);
-        xNew(1:2:end-1) = rand(1,1)*.4+0.05;
-        xNew(2:2:end) = rand(1,1)*.1+.8;
+        xNew(1:2:end-1) = rand(1,1)*4.9+0.05;
+        xNew(2:2:end) = rand(1,1)*2+4;
         x = [x;xNew];
         v = [v;zeros(2,1)];
         %r = [r;0.05*ones(1,1)];
-        r = [r;0.01+0.0025*rand(1,1)];
+        r = [r;0.03+0.005*rand(1,1)];
     end
     
     n = length(x);
@@ -80,14 +81,14 @@ for i=1:5000
     vCur = v;
     
     [xCur, vCur] = process_collisions( h, kr, xCur, vCur, r, Q, Qi, bNorms, bDists );
-    [a, vCur] = compute_accelerations( xCur, vCur, r, Q, Qi, bNorms, bDists );
+    [a, vCur] = compute_accelerations( xCur, vCur, r, Q, Qi, bNorms, bDists, false );
     
     vCur = vCur + h*a;
 
     x = xCur;
     v = vCur;
     
-    fileID = fopen( sprintf('D:\\particles_tk003_%04d.csv', i),'w');
+    fileID = fopen( sprintf(path, i),'w');
     fprintf(fileID,'float32 Position[0],float32 Position[1],float32 Position[2],float32 Radius\r\n');
     fprintf(fileID,'%g, %g, 0.0, %g\r\n',[reshape( x, 2, [] ); r']);
     fclose(fileID);

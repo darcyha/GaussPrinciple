@@ -1,5 +1,4 @@
 function [x,v] = process_collisions( h, kr, x, v, r, Q, Qi, bN, bD )
-global opts;
 
 assert( length(x) == 2*length(r) );
 assert( length(bN) == 2*length(bD) );
@@ -97,8 +96,8 @@ while( stepLeft > 0 )
         
         k = J \ c; %Jk = c;
         s = Q*(k - v);
-        out = solnls(Qi'*J',s,zeros( size(J,1),1 ),opts);
-        lambda = out.x;      
+        %lambda = lsqnonneg( Qi'*J', s );
+        lambda = SBB_NNLS(Qi'*J',zeros( size(J,1),1 ),s);
 
         v = v + Q' \ (Q \ (J' * lambda));
     else

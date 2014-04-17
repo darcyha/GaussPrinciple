@@ -1,16 +1,18 @@
-function [a,v]=compute_accelerations( x, v, r, Q, Qi, bN, bD )
-global opts;
+function [a,v]=compute_accelerations( x, v, r, Q, Qi, bN, bD, verbose )
+global timing;
 
 %Calculate acceleration. Gravity is a known acceleration [0; -1] here.
 a = zeros( size(x) );
 a( 2:2:end ) = -1;
 
 %Apply contact constraints
-J = [];
-c = [];
-
 assert( length(x) == 2*length(r) );
 assert( length(bN) == 2*length(bD) );
+
+rows = [];
+cols = [];
+vals = [];
+nc = 0;
 
 for i=1:length(r)
     idex = [2*i-1,2*i];
@@ -31,10 +33,10 @@ for i=1:length(r)
             
             %v(idex) = vCur * .99;
             
-            Jrow = zeros( 1, length(x) );
-            Jrow( idex ) = bNCur;
-            J = [J; Jrow];
-            c = [c; 0];
+            nc = nc + 1;
+            rows = [rows, nc, nc];
+            cols = [cols, idex];
+            vals = [vals, bNCur'];
         end
     end
     
@@ -46,20 +48,34 @@ for i=1:length(r)
         if( flag )
             n = xCur - xOther;
             n = n / sqrt(n'*n);
-            Jrow = zeros( 1, length(x) );
-            Jrow( idex ) = n;
-            Jrow( jdex ) = -n;
-            J = [J; Jrow];
-            c = [c; 0];
+            
+            nc = nc + 1;
+            rows = [rows, nc, nc, nc, nc];
+            cols = [cols, idex, jdex];
+            vals = [vals, n', -n'];
         end
     end
 end
 
-if( size(J,1) > 0 )
-    k = zeros( size(a) ); %Jk = c;
+J = sparse( rows, cols, vals, nc, size(x,1) );
+
+if( verbose )
+    fprintf( '\tJ is %dx%d\n', size(J,1), size(J,2) );
+end
+
+if( nc > 0 )
+    k = zeros( size(a) ); %Jk = c, c is zeros.
     s = Q*(k - a);
-    out = solnls(Qi'*J',s,zeros( size(J,1),1 ),opts);
-    lambda = out.x;
+    
+    t = cputime;
+    %lambda = lsqnonneg( Qi'*J', s );
+    lambda = SBB_NNLS(Qi'*J',zeros( size(J,1),1 ),s );
+    e = cputime-t;
+    
+    if( verbose )
+        timing = [timing [size(J,1); size(J,2); e]];
+        fprintf( '\tElaspsed time: %f\n', e );
+    end
 
     a = a + Q' \ (Q \ (J' * lambda));
 end
